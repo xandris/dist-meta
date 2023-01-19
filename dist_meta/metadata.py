@@ -42,10 +42,11 @@ from dist_meta.metadata_mapping import MetadataEmitter, MetadataMapping
 __all__ = ("dump", "dumps", "load", "loads", "MissingFieldError")
 
 WSP = " \t"
-DELIMITER = "\n\n"
 NEWLINE_MARK = '\uf8ff'
 
-_unfold_re = re.compile(rf"\n([{WSP}])")
+_re_delimiter = re.compile(rf"\r\n\r\n|\r\r|\n\n")
+_split_re = re.compile(rf"\r\n?|\n")
+_unfold_re = re.compile(rf"(?:{_split_re.pattern})([{WSP}])")
 
 
 def _clean_desc(lines: List[str], wsp: str) -> List[str]:
@@ -95,15 +96,16 @@ def loads(rawtext: str) -> MetadataMapping:
 	:returns: A mapping of the metadata fields, and the long description
 	"""
 
-	if DELIMITER in rawtext:
-		rawtext, body = rawtext.split(DELIMITER, maxsplit=1)
+	delim = _re_delimiter.search(rawtext)
+	if delim:
+		rawtext, body = rawtext[:delim.start()], rawtext[delim.end():]
 	else:
 		body = ''
 
 	# unfold per RFC 5322 § 2.2.3
 	rawtext = _unfold_re.sub(fr"{NEWLINE_MARK}\1", rawtext)
 
-	file_content: List[str] = rawtext.split('\n')
+	file_content: List[str] = _split_re.split(rawtext)
 	file_content.reverse()
 
 	fields: MetadataMapping = MetadataMapping()
